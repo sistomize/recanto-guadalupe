@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Recanto Guadalupe · Tour 360</title>
+<style>
+  /* Tour imersivo em tela cheia: um único visual escuro, deliberado */
+  :root{--bg:#141110;--fg:#ffffff;--panel:rgba(20,16,12,.58);--panel-strong:rgba(20,16,12,.74);--accent:#8b623e;--accent-ink:#6b4a2e;--line:rgba(255,255,255,.22);color-scheme:dark}
+  *{box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  #stage{position:fixed;inset:0;touch-action:none;cursor:grab}
+  #stage.drag{cursor:grabbing}
+  #fade{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .35s ease}
+  #title{position:fixed;top:calc(18px + env(safe-area-inset-top,0px));left:calc(20px + env(safe-area-inset-left,0px));padding:10px 16px;background:var(--panel);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;pointer-events:none}
+  #title h1{font-size:16px;font-weight:600;margin:0}
+  #title p{font-size:12.5px;opacity:.85;margin:2px 0 0}
+  #title .tag{display:inline-block;margin-top:6px;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;padding:2px 8px;border:1px solid var(--line);border-radius:20px;opacity:.85}
+  #rooms{position:fixed;max-height:calc(100vh - 120px);overflow-y:auto;top:calc(18px + env(safe-area-inset-top,0px));right:calc(20px + env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:6px}
+  #rooms button,#bar button{font:inherit;font-size:13px;color:var(--fg);background:var(--panel);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:10px;padding:8px 14px;cursor:pointer;text-align:left;transition:background .2s}
+  #rooms button:hover,#bar button:hover{background:rgba(120,86,56,.75)}
+  #rooms button:focus-visible,#bar button:focus-visible,.hs .dot:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  #rooms button.on,#bar button.on{background:var(--accent)}
+  #bar{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);display:flex;gap:8px}
+  #hint{position:fixed;bottom:calc(74px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);font-size:13px;background:var(--panel-strong);padding:8px 14px;border-radius:20px;white-space:nowrap;pointer-events:none;transition:opacity 1s}
+  .hs{position:fixed;left:0;top:0;width:0;height:0;pointer-events:none}
+  .hs .dot{position:absolute;left:-26px;top:-26px;width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 2px 14px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;transition:transform .2s;border:0}
+  .hs .dot:hover{transform:scale(1.1)}
+  .hs .dot::before{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(255,255,255,.85);animation:pulse 1.8s ease-out infinite}
+  .hs .dot svg{width:24px;height:24px}
+  .hs .lbl{position:absolute;left:34px;top:-15px;white-space:nowrap;font-size:13px;font-weight:500;background:var(--panel-strong);padding:6px 11px;border-radius:8px;pointer-events:none}
+  @keyframes pulse{0%{transform:scale(.85);opacity:1}100%{transform:scale(1.45);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.hs .dot::before{animation:none}}
+  .ic{position:fixed;left:0;top:0;width:0;height:0;pointer-events:none}
+  .ic button{position:absolute;left:-22px;top:-22px;width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.9);background:rgba(139,98,62,.88);box-shadow:0 2px 12px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;transition:transform .2s;padding:0}
+  .ic button:hover{transform:scale(1.1)}
+  .ic button:focus-visible{outline:2px solid #fff;outline-offset:3px}
+  .ic svg{width:22px;height:22px}
+  .ic .lbl{position:absolute;left:30px;top:-14px;white-space:nowrap;font-size:12.5px;font-weight:500;background:var(--panel-strong);padding:5px 10px;border-radius:8px;pointer-events:none;display:flex;align-items:center;gap:6px}
+  .ic .sw{width:11px;height:11px;border-radius:50%;border:1px solid rgba(255,255,255,.7)}
+  #tvcredit{position:fixed;left:calc(16px + env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));font-size:11px;background:var(--panel-strong);padding:5px 9px;border-radius:7px;opacity:.85;pointer-events:none}
+  .ic .mute{position:absolute;left:-74px;top:-22px;width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.9);background:rgba(139,98,62,.88);box-shadow:0 2px 12px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;padding:0}
+  .ic .mute svg{width:22px;height:22px}
+  .ic .mute:hover{transform:scale(1.1)}
+  .ic .mute:focus-visible{outline:2px solid #fff;outline-offset:3px}
+  #luzbtn{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:8px;z-index:6;background:none;border:0;padding:0;cursor:pointer;color:#fff;font:inherit}
+  #luzbtn .lb{font-size:12.5px;font-weight:500;background:var(--panel-strong);padding:6px 11px;border-radius:8px}
+  #luzbtn .rd{width:50px;height:50px;border-radius:50%;border:2px solid rgba(255,255,255,.9);background:rgba(139,98,62,.92);box-shadow:0 2px 12px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;transition:transform .2s,background .3s}
+  #luzbtn:hover .rd{transform:scale(1.08)}
+  #luzbtn.off .rd{background:rgba(40,40,44,.92)}
+  #luzbtn:focus-visible .rd{outline:2px solid #fff;outline-offset:3px}
+  #luzbtn svg{width:24px;height:24px}
+  #luzbtn[hidden]{display:none}
+  #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);font-size:14px;letter-spacing:.4px;transition:opacity .6s}
+  @media (max-width:900px), (hover:none) and (pointer:coarse){
+    #title,#rooms,#bar{display:none}
+    #hint{bottom:calc(28px + env(safe-area-inset-bottom,0px));font-size:12.5px}
+  }
+</style>
+</head>
+<body>
+
+
+<div id="stage"></div>
+<div id="hs-layer"></div>
+<div id="ic-layer"></div>
+<button id="luzbtn" type="button" aria-label="Apagar as luzes"><span class="lb">Apagar as luzes</span><span class="rd"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg></span></button>
+<div id="tvcredit" hidden>Vídeo na TV: Razrfish – “Mocassins”, CC BY 3.0, via Wikimedia Commons</div>
+<div id="fade"></div>
+<div id="title"><h1>Recanto Guadalupe</h1><p id="roomname">Varanda da frente</p><span class="tag" id="modetag">Render</span></div>
+<div id="rooms"></div>
+<div id="bar">
+  <button id="btn-render" type="button" class="on">Render</button>
+  <button id="btn-mod" type="button">Modelagem</button>
+  <button id="btn-rot" type="button">Girar sozinho</button>
+  <button id="btn-fs" type="button">Tela cheia</button>
+</div>
+<div id="hint">Arraste para olhar em volta · toque nos círculos para andar</div>
+<div id="loading">Carregando o tour…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  // lon: 0 = centro da imagem, positivo = direita; lat: positivo = para cima
+  var ROOMS = {"Sala": {"name": "Sala", "img": {"render": "Sala_render.jpg", "mod": "Sala_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Copa", "lon": 107.6, "lat": -26.2, "label": "Ir para: Copa", "arrive": {"lon": 107.6, "lat": 0}}, {"to": "Cozinha", "lon": 92.9, "lat": -14.6, "label": "Ir para: Cozinha", "arrive": {"lon": -60.5, "lat": 0}}, {"to": "VarandaFrente1", "lon": -76.0, "lat": -34.4, "label": "Ir para: Varanda da frente", "arrive": {"lon": 119.9, "lat": 0}}, {"to": "VarandaFrente2", "lon": -96.5, "lat": -35.0, "label": "Ir para: Varanda da frente 2", "arrive": {"lon": 69.8, "lat": 0}}]}, "Copa": {"name": "Copa", "img": {"render": "Copa_render_v3.jpg", "mod": "Copa_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Sala", "lon": -72.4, "lat": -26.2, "label": "Ir para: Sala", "arrive": {"lon": -72.4, "lat": 0}}, {"to": "Cozinha", "lon": 77.6, "lat": -27.2, "label": "Ir para: Cozinha", "arrive": {"lon": -75.9, "lat": 0}}, {"to": "Corredor", "lon": 12.1, "lat": -18.8, "label": "Ir para: Corredor", "arrive": {"lon": -122.9, "lat": 0}}, {"to": "Lateral2", "lon": 156.7, "lat": -38, "label": "Ir para: Varanda lateral 2", "arrive": {"lon": 2.0, "lat": 0}}]}, "Cozinha": {"name": "Cozinha", "img": {"render": "Cozinha_render.jpg", "mod": "Cozinha_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Copa", "lon": 104.1, "lat": -27.2, "label": "Ir para: Copa", "arrive": {"lon": -102.4, "lat": 0}}, {"to": "Sala", "lon": 119.5, "lat": -14.6, "label": "Ir para: Sala", "arrive": {"lon": -87.1, "lat": 0}}, {"to": "Corredor", "lon": 178.8, "lat": -19.8, "label": "Ir para: Corredor", "arrive": {"lon": -162.8, "lat": 0}}, {"to": "Fundos", "lon": -105.3, "lat": -22.1, "label": "Ir para: Varanda dos fundos", "arrive": {"lon": -49.8, "lat": 0}}]}, "Suite": {"name": "Suíte", "img": {"render": "Suite_render.jpg", "mod": "Suite_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "SuiteEntrada", "lon": -28.8, "lat": -28.0, "label": "Ir para: Suíte (entrada)", "arrive": {"lon": -165.0, "lat": 0}}]}, "SuiteEntrada": {"name": "Suíte (entrada)", "img": {"render": "SuiteEntrada_render.jpg", "mod": "SuiteEntrada_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Corredor", "lon": 137.9, "lat": -38, "label": "Ir para: Corredor", "arrive": {"lon": -45.0, "lat": 0}}, {"to": "Suite", "lon": 15.0, "lat": -28.0, "label": "Ir para: Suíte", "arrive": {"lon": 151.2, "lat": 0}}, {"to": "Closet", "lon": 114.1, "lat": -38, "label": "Ir para: Closet", "arrive": {"lon": -42.3, "lat": 0}}]}, "Closet": {"name": "Closet", "img": {"render": "Closet_render.jpg", "mod": "Closet_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "SuiteEntrada", "lon": 137.7, "lat": -38, "label": "Ir para: Suíte (entrada)", "arrive": {"lon": -65.9, "lat": 0}}, {"to": "BanhoSuite", "lon": -34.4, "lat": -38, "label": "Ir para: Banheiro da suíte", "arrive": {"lon": -93.6, "lat": 0}}]}, "BanhoSuite": {"name": "Banheiro da suíte", "img": {"render": "BanhoSuite_render.jpg", "mod": "BanhoSuite_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Closet", "lon": 86.4, "lat": -38, "label": "Ir para: Closet", "arrive": {"lon": 145.6, "lat": 0}}]}, "BanhoSocial": {"name": "Banheiro social", "img": {"render": "BanhoSocial_render.jpg", "mod": "BanhoSocial_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Corredor", "lon": -156.8, "lat": -38, "label": "Ir para: Corredor", "arrive": {"lon": 49.4, "lat": 0}}]}, "QuartoSolteiro": {"name": "Quarto de solteiro", "img": {"render": "QuartoSolteiro_render.jpg", "mod": "QuartoSolteiro_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Corredor", "lon": -70.3, "lat": -36.6, "label": "Ir para: Corredor", "arrive": {"lon": 124.2, "lat": 0}}]}, "QuartoCasal": {"name": "Quarto de casal", "img": {"render": "QuartoCasal_render.jpg", "mod": "QuartoCasal_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Corredor", "lon": -129.2, "lat": -38, "label": "Ir para: Corredor", "arrive": {"lon": 135.0, "lat": 0}}]}, "Corredor": {"name": "Corredor", "img": {"render": "Corredor_render_v2.jpg", "mod": "Corredor_modelagem_v2.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Copa", "lon": 57.1, "lat": -18.8, "label": "Ir para: Copa", "arrive": {"lon": -167.9, "lat": 0}}, {"to": "Cozinha", "lon": 17.2, "lat": -19.8, "label": "Ir para: Cozinha", "arrive": {"lon": -1.2, "lat": 0}}, {"to": "BanhoSocial", "lon": -130.6, "lat": -38, "label": "Ir para: Banheiro social", "arrive": {"lon": 23.2, "lat": 0}}, {"to": "QuartoSolteiro", "lon": -55.8, "lat": -24.1, "label": "Ir para: Quarto de solteiro", "arrive": {"lon": 109.7, "lat": 0}}, {"to": "QuartoCasal", "lon": -45.0, "lat": -21.7, "label": "Ir para: Quarto de casal", "arrive": {"lon": 50.8, "lat": 0}}, {"to": "SuiteEntrada", "lon": 135.0, "lat": -35.5, "label": "Ir para: Suíte (entrada)", "arrive": {"lon": -42.1, "lat": 0}}]}, "Despensa": {"name": "Despensa", "img": {"render": "Despensa_render.jpg", "mod": "Despensa_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "AreaServico", "lon": -144.5, "lat": -38, "label": "Ir para: Área de serviço", "arrive": {"lon": 37.6, "lat": 0}}]}, "AreaServico": {"name": "Área de serviço", "img": {"render": "AreaServico_render.jpg", "mod": "AreaServico_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Fundos", "lon": 22.4, "lat": -23.0, "label": "Ir para: Varanda dos fundos", "arrive": {"lon": 22.4, "lat": 0}}, {"to": "Despensa", "lon": -142.4, "lat": -35.2, "label": "Ir para: Despensa", "arrive": {"lon": 35.5, "lat": 0}}]}, "VarandaFrente1": {"name": "Varanda da frente", "img": {"render": "VarandaFrente1_render_v5.jpg", "mod": "VarandaFrente1_modelagem_v2.jpg"}, "start": {"lon": -60.1, "lat": 0}, "links": [{"to": "Sala", "lon": -60.1, "lat": -17.2, "label": "Ir para: Sala", "arrive": {"lon": 104.0, "lat": 0}}, {"to": "VarandaFrente2", "lon": 0.0, "lat": -17.6, "label": "Ir para: Varanda da frente 2", "arrive": {"lon": 0.0, "lat": 0}}, {"to": "FogoCaminho", "lon": -158.1, "lat": -12, "label": "Ir para: Caminho da fogueira", "arrive": {"lon": -68.1, "lat": 0}}, {"to": "Lago", "lon": 105.6, "lat": -14.2, "label": "Ir para: Lago", "arrive": {"lon": 15.6, "lat": 0}}]}, "VarandaFrente2": {"name": "Varanda da frente 2", "img": {"render": "VarandaFrente2_render_v5.jpg", "mod": "VarandaFrente2_modelagem_v2.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Sala", "lon": -110.2, "lat": -18.5, "label": "Ir para: Sala", "arrive": {"lon": 83.5, "lat": 0}}, {"to": "VarandaFrente1", "lon": -180.0, "lat": -17.6, "label": "Ir para: Varanda da frente", "arrive": {"lon": -180.0, "lat": 0}}, {"to": "Lateral1", "lon": -74.7, "lat": -15.2, "label": "Ir para: Varanda lateral", "arrive": {"lon": -74.7, "lat": 0}}, {"to": "Estacionamento", "lon": 68.1, "lat": -12, "label": "Ir para: Estacionamento", "arrive": {"lon": 68.1, "lat": 0}}]}, "Lateral1": {"name": "Varanda lateral", "img": {"render": "Lateral1_render.jpg", "mod": "Lateral1_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "VarandaFrente2", "lon": 105.3, "lat": -15.2, "label": "Ir para: Varanda da frente 2", "arrive": {"lon": 105.3, "lat": 0}}, {"to": "Lateral2", "lon": -90.0, "lat": -14.5, "label": "Ir para: Varanda lateral 2", "arrive": {"lon": -45.0, "lat": 0}}]}, "Lateral2": {"name": "Varanda lateral 2", "img": {"render": "Lateral2_render.jpg", "mod": "Lateral2_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Copa", "lon": -178.0, "lat": -31.9, "label": "Ir para: Copa", "arrive": {"lon": -23.3, "lat": 0}}, {"to": "Lateral1", "lon": 135.0, "lat": -14.5, "label": "Ir para: Varanda lateral", "arrive": {"lon": 90.0, "lat": 0}}, {"to": "Lateral3", "lon": -50.6, "lat": -20.6, "label": "Ir para: Varanda lateral 3", "arrive": {"lon": -95.6, "lat": 0}}, {"to": "Deck1", "lon": 45.0, "lat": -15.2, "label": "Ir para: Deck do ipê", "arrive": {"lon": 45.0, "lat": 0}}]}, "Lateral3": {"name": "Varanda lateral 3", "img": {"render": "Lateral3_render.jpg", "mod": "Lateral3_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Lateral2", "lon": 84.4, "lat": -20.6, "label": "Ir para: Varanda lateral 2", "arrive": {"lon": 129.4, "lat": 0}}, {"to": "Fundos", "lon": -148.8, "lat": -21.9, "label": "Ir para: Varanda dos fundos", "arrive": {"lon": -148.8, "lat": 0}}]}, "Fundos": {"name": "Varanda dos fundos", "img": {"render": "Fundos_render.jpg", "mod": "Fundos_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Cozinha", "lon": 130.2, "lat": -27.8, "label": "Ir para: Cozinha", "arrive": {"lon": 74.7, "lat": 0}}, {"to": "Lateral3", "lon": 31.2, "lat": -21.9, "label": "Ir para: Varanda lateral 3", "arrive": {"lon": 31.2, "lat": 0}}, {"to": "AreaServico", "lon": -157.6, "lat": -22.9, "label": "Ir para: Área de serviço", "arrive": {"lon": -157.6, "lat": 0}}, {"to": "Gourmet1", "lon": -123.7, "lat": -12, "label": "Ir para: Área gourmet", "arrive": {"lon": -123.7, "lat": 0}}, {"to": "Gourmet2", "lon": -67.1, "lat": -12.6, "label": "Ir para: Área gourmet 2", "arrive": {"lon": -67.1, "lat": 0}}]}, "Gourmet1": {"name": "Área gourmet", "img": {"render": "Gourmet1_render.jpg", "mod": "Gourmet1_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Fundos", "lon": 56.3, "lat": -12, "label": "Ir para: Varanda dos fundos", "arrive": {"lon": 56.3, "lat": 0}}, {"to": "Gourmet2", "lon": 6.1, "lat": -12, "label": "Ir para: Área gourmet 2", "arrive": {"lon": 6.1, "lat": 0}}]}, "Gourmet2": {"name": "Área gourmet 2", "img": {"render": "Gourmet2_render.jpg", "mod": "Gourmet2_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Fundos", "lon": 112.9, "lat": -12.6, "label": "Ir para: Varanda dos fundos", "arrive": {"lon": 112.9, "lat": 0}}, {"to": "Gourmet1", "lon": -173.9, "lat": -12, "label": "Ir para: Área gourmet", "arrive": {"lon": -173.9, "lat": 0}}]}, "Deck1": {"name": "Deck do ipê", "img": {"render": "Deck1_render.jpg", "mod": "Deck1_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Lateral2", "lon": -135.0, "lat": -16.6, "label": "Ir para: Varanda lateral 2", "arrive": {"lon": -135.0, "lat": 0}}, {"to": "Deck2", "lon": 65.9, "lat": -16.1, "label": "Ir para: Deck do ipê 2", "arrive": {"lon": 20.9, "lat": 0}}]}, "Deck2": {"name": "Deck do ipê 2", "img": {"render": "Deck2_render_v2.jpg", "mod": "Deck2_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "Deck1", "lon": -159.1, "lat": -16.1, "label": "Ir para: Deck do ipê", "arrive": {"lon": -114.1, "lat": 0}}]}, "Estacionamento": {"name": "Estacionamento", "img": {"render": "Estacionamento_render.jpg", "mod": "Estacionamento_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "VarandaFrente2", "lon": -111.9, "lat": -12, "label": "Ir para: Varanda da frente 2", "arrive": {"lon": -111.9, "lat": 0}}, {"to": "Lago", "lon": -172.2, "lat": -12, "label": "Ir para: Lago", "arrive": {"lon": 97.8, "lat": 0}}]}, "Lago": {"name": "Lago", "img": {"render": "Lago_render.jpg", "mod": "Lago_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "VarandaFrente1", "lon": -164.4, "lat": -14.1, "label": "Ir para: Varanda da frente", "arrive": {"lon": -74.4, "lat": 0}}, {"to": "Estacionamento", "lon": -82.2, "lat": -12, "label": "Ir para: Estacionamento", "arrive": {"lon": 7.8, "lat": 0}}]}, "FogoCaminho": {"name": "Caminho da fogueira", "img": {"render": "FogoCaminho_render.jpg", "mod": "FogoCaminho_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "VarandaFrente1", "lon": 111.9, "lat": -12, "label": "Ir para: Varanda da frente", "arrive": {"lon": 21.9, "lat": 0}}, {"to": "Fogueira", "lon": -44.3, "lat": -12, "label": "Ir para: Roda de fogueira", "arrive": {"lon": -89.3, "lat": 0}}]}, "Fogueira": {"name": "Roda de fogueira", "img": {"render": "Fogueira_render.jpg", "mod": "Fogueira_modelagem.jpg"}, "start": {"lon": 0, "lat": 0}, "links": [{"to": "FogoCaminho", "lon": 90.7, "lat": -12, "label": "Ir para: Caminho da fogueira", "arrive": {"lon": 135.7, "lat": 0}}]}};
+  var ORDER = ["VarandaFrente1", "VarandaFrente2", "Estacionamento", "Lago", "Sala", "Copa", "Cozinha", "Corredor", "Suite", "SuiteEntrada", "Closet", "BanhoSuite", "BanhoSocial", "QuartoSolteiro", "QuartoCasal", "AreaServico", "Despensa", "Fundos", "Lateral1", "Lateral2", "Lateral3", "Gourmet1", "Gourmet2", "Deck1", "Deck2", "FogoCaminho", "Fogueira"];
+  var mode = "render";
+
+  function VW(){ var v = window.visualViewport; return Math.round(v ? Math.min(v.width, document.documentElement.clientWidth || v.width) : document.documentElement.clientWidth); }
+  function VH(){ var v = window.visualViewport; return Math.round(v ? Math.min(v.height, document.documentElement.clientHeight || v.height) : document.documentElement.clientHeight); }
+  var stage = document.getElementById("stage");
+  var renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  renderer.setSize(VW(), VH());
+  stage.appendChild(renderer.domElement);
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(75, VW()/VH(), 1, 1100);
+  var geo = new THREE.SphereGeometry(500,96,64); geo.scale(-1,1,1);
+  var CORES = {"Sala": {"lref": [0.8158, 0.2263], "sofa": [-155.48, -30], "coz": [88.96, -2.55], "lrefR": [0.5876, 0.1563]}, "Copa": {"lref": [0.8119, 0.2267], "sofa": [-97.46, -18.24], "coz": [72.29, -10.51], "lrefR": [0.5982, 0.1346]}, "Cozinha": {"lref": [0.4548, 0.2348], "sofa": null, "coz": [-75, -14], "lrefR": [0.49, 0.1706]}, "Corredor": {"lref": [0.0594, 0.2624], "sofa": null, "coz": [-12.25, 1.31], "lrefR": [0.2187, 0.1451]}};
+  var blank = new THREE.DataTexture(new Uint8Array([0,0,0,255]), 1, 1, THREE.RGBAFormat); blank.needsUpdate = true;
+  var mat = new THREE.ShaderMaterial({
+    uniforms:{map:{value:blank}, mask:{value:blank}, pintMap:{value:blank}, usePint:{value:0}, pCol:{value:new THREE.Vector3(1,1,1)}, offMap:{value:blank}, ledMap:{value:blank}, useLight:{value:0}, lightOff:{value:0}, ledOn:{value:0}, var1:{value:blank}, var2:{value:blank}, optA:{value:blank}, optB:{value:blank}, optC:{value:blank}, hasOpt:{value:0}, w1A:{value:new THREE.Vector3()}, w1B:{value:new THREE.Vector3()}, w2A:{value:new THREE.Vector3()}, w2B:{value:new THREE.Vector3()}, w1C:{value:new THREE.Vector3()}, w2C:{value:new THREE.Vector3()}, useMask:{value:0}, sofaOn:{value:0}, cozOn:{value:0},
+      lref:{value:new THREE.Vector2(.8,.49)}, tSofa:{value:new THREE.Vector3(62/255,63/255,68/255)}, tCoz:{value:new THREE.Vector3(58/255,60/255,64/255)}},
+    vertexShader:"varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }",
+    fragmentShader:"uniform sampler2D map; uniform sampler2D mask; uniform sampler2D pintMap; uniform float usePint; uniform vec3 pCol; uniform sampler2D offMap; uniform sampler2D ledMap; uniform float useLight; uniform float lightOff; uniform float ledOn; uniform sampler2D var1; uniform sampler2D var2; uniform sampler2D optA; uniform sampler2D optB; uniform sampler2D optC; uniform float hasOpt; uniform vec3 w1A; uniform vec3 w1B; uniform vec3 w2A; uniform vec3 w2B; uniform vec3 w1C; uniform vec3 w2C; uniform float useMask; uniform float sofaOn; uniform float cozOn; uniform vec2 lref; uniform vec3 tSofa; uniform vec3 tCoz; varying vec2 vUv;"+
+      "void main(){ vec3 c=texture2D(map,vUv).rgb;"+
+      " if(hasOpt>0.5){ vec3 a=texture2D(optA,vUv).rgb; vec3 b=texture2D(optB,vUv).rgb; vec3 cc=texture2D(optC,vUv).rgb; float k1=clamp(dot(a,w1A)+dot(b,w1B)+dot(cc,w1C),0.0,1.0); float k2=clamp(dot(a,w2A)+dot(b,w2B)+dot(cc,w2C),0.0,1.0);"+
+      " if(k1>0.002) c=mix(c,texture2D(var1,vUv).rgb,k1); if(k2>0.002) c=mix(c,texture2D(var2,vUv).rgb,k2); }"+
+      " if(useMask>0.5){ vec2 m=texture2D(mask,vUv).rg; float L=dot(c,vec3(0.299,0.587,0.114));"+
+      " vec3 rs=tSofa*pow(clamp(L/lref.x,0.25,1.8),0.9); vec3 rc=tCoz*pow(clamp(L/lref.y,0.25,1.8),0.9);"+
+      " c=mix(c,rs,m.r*sofaOn); c=mix(c,rc,m.g*cozOn);}  if(usePint>0.5){ float pm=texture2D(pintMap,vUv).r; c=mix(c,c*pCol,pm); } if(useLight>0.5){ vec3 ro=texture2D(offMap,vUv).rgb*2.0; vec3 gl=texture2D(ledMap,vUv).rgb*ledOn*(1.0-lightOff); c=c*mix(vec3(1.0),ro,lightOff); c=clamp(c+gl*(1.0-0.5*c),0.0,1.0); } gl_FragColor=vec4(c,1.0); }"
+  });
+  scene.add(new THREE.Mesh(geo, mat));
+
+  var loader = new THREE.TextureLoader(), cache = {};
+  function getTex(key, cb, m){
+    var md = m || mode, ck = key + "|" + md;
+    if (cache[ck]) { cb(cache[ck]); return; }
+    loader.load(ROOMS[key].img[md], function(t){
+      t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+      if (renderer.capabilities.getMaxAnisotropy) t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      cache[ck] = t; cb(t);
+    });
+  }
+  var view = {lon:0, lat:0, fov:75}, current = null, busy = false, autoRot = false;
+  function dirFor(lon, lat){
+    var phi = THREE.MathUtils.degToRad(90 - lat), theta = THREE.MathUtils.degToRad(180 + lon);
+    return new THREE.Vector3(Math.sin(phi)*Math.cos(theta), Math.cos(phi), Math.sin(phi)*Math.sin(theta));
+  }
+  var layer = document.getElementById("hs-layer"), hsEls = [];
+  var ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="#6b4a2e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>';
+  function buildHotspots(key){
+    layer.innerHTML = ""; hsEls = [];
+    ROOMS[key].links.forEach(function(l){
+      var el = document.createElement("div"); el.className = "hs";
+      el.innerHTML = '<button class="dot" type="button" aria-label="' + l.label + '">' + ARROW + '</button><div class="lbl">' + l.label + '</div>';
+      el.querySelector(".dot").addEventListener("click", function(e){ e.stopPropagation(); walkTo(l); });
+      layer.appendChild(el);
+      hsEls.push({el:el, v:dirFor(l.lon, l.lat).multiplyScalar(450)});
+    });
+  }
+  function placeHotspots(){
+    var w = VW(), h = VH();
+    hsEls.forEach(function(o){
+      var p = o.v.clone().project(camera);
+      var vis = p.z < 1 && Math.abs(p.x) < 1.2 && Math.abs(p.y) < 1.2;
+      o.el.style.display = vis ? "block" : "none";
+      if (vis) o.el.style.transform = "translate(" + ((p.x+1)/2*w) + "px," + ((1-p.y)/2*h) + "px)";
+    });
+  }
+  var roomsBox = document.getElementById("rooms");
+  ORDER.forEach(function(k){
+    var b = document.createElement("button"); b.type = "button"; b.textContent = ROOMS[k].name; b.dataset.k = k;
+    b.addEventListener("click", function(){ if (k !== current && !busy) jumpTo(k, ROOMS[k].start); });
+    roomsBox.appendChild(b);
+  });
+  function setRoom(key, look){
+    current = key; mat.uniforms.map.value = cache[key + "|" + mode]; applyMask(key); enterOptRoom(key); enterLightRoom(key); enterPintRoom(key);
+    view.lon = look.lon; view.lat = look.lat;
+    document.getElementById("roomname").textContent = ROOMS[key].name;
+    [].forEach.call(roomsBox.children, function(b){ b.classList.toggle("on", b.dataset.k === key); });
+    buildHotspots(key); buildIcons(key); buildTV(key); syncMute();
+    setTimeout(function(){ ROOMS[key].links.forEach(function(l){ getTex(l.to, function(){}); }); }, 1200);
+  }
+  // ---- troca de cores: sofá (claro/grafite) e armários (verde/bege/grafite) ----
+  var SOFA = [{n:"claro", c:null, sw:"#e9dfcc"}, {n:"grafite", c:[62,63,68], sw:"#3e3f44"}];
+  var COZ = [{n:"grafite", c:null, sw:"#3a3c40"}, {n:"verde", c:[112,116,78], sw:"#6f7a4c"}, {n:"bege", c:[206,190,158], sw:"#cebe9e"}];
+  var MASK_VER = {"Copa": "_v2"};   // máscara refeita depois da correção do sofá da copa
+  var sofaI = 0, cozI = 0, maskCache = {};   // armários: o modelo já está em grafite
+  function applyMask(key){
+    var cfg = CORES[key];
+    mat.uniforms.useMask.value = 0;
+    if (!cfg) return;
+    var lr = (mode === "render" && cfg.lrefR) ? cfg.lrefR : cfg.lref;
+    mat.uniforms.lref.value.set(lr[0], lr[1]);
+    function on(t){ if (current === key){ mat.uniforms.mask.value = t; mat.uniforms.useMask.value = 1; } }
+    if (maskCache[key]) { on(maskCache[key]); return; }
+    loader.load(key + "_mask" + (MASK_VER[key] || "") + ".png", function(t){ t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; maskCache[key] = t; on(t); });
+  }
+  function setV3(v, c){ v.set(c[0]/255, c[1]/255, c[2]/255); }
+  function tweenColor(onU, tU, from, to){
+    // from/to: null = cor original
+    var a0 = onU.value, a1 = to ? 1 : 0;
+    var c0 = from ? from.slice() : null, c1 = to;
+    if (!c0 && c1) setV3(tU.value, c1);
+    anim(550, function(e){
+      onU.value = a0 + (a1 - a0)*e;
+      if (c0 && c1) setV3(tU.value, [c0[0]+(c1[0]-c0[0])*e, c0[1]+(c1[1]-c0[1])*e, c0[2]+(c1[2]-c0[2])*e]);
+    });
+  }
+  var SOFA_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3"/><path d="M2 13a2 2 0 0 1 4 0v2h12v-2a2 2 0 0 1 4 0v4a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/><path d="M5 18v2M19 18v2"/></svg>';
+  var COZ_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M12 4v16M3 11h18"/><path d="M9.5 7v2M14.5 7v2M9.5 14v3M14.5 14v3"/></svg>';
+  // ---- opções de acabamento ----
+  var MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || Math.min(screen.width, screen.height) < 820;
+  var OPT_POS = {"Sala": {"piso": [47.2, -27.3], "cortina": [-107.6, 16.9], "parede": [35.6, 13.9]}, "Copa": {"piso": [57.6, -42.1], "cortina": [-112.0, -35.7], "parede": [-15.1, 12.3], "bancada": [48.3, -20.2]}, "Cozinha": {"piso": [-81.8, -41.2], "aereos": [-13.2, 13.5], "bancada": [-144.4, -34.5]}, "Corredor": {"piso": [36.1, -36.3], "madeira": [-34.4, -42.3], "portal": [76.0, 21.7]}, "Suite": {"madeira": [-69.2, -42.5], "cortina": [77.6, 5.8], "cabeceira": [-16.8, 15.7], "tvsuite": [-127.0, 14.5]}, "Closet": {}, "QuartoCasal": {"madeira": [121.6, -43.9], "cortina": [-23.5, 16.9]}, "QuartoSolteiro": {"madeira": [67.6, -42.5], "cortina": [77.3, 18.9]}, "SuiteEntrada": {"madeira": [48.6, -40.2], "cortina": [-42.3, 19.0], "cabeceira": [-135.9, -11.5], "tvsuite": [40.0, 12.3]}};
+  var OPT_ROOMS = ["Closet", "Copa", "Corredor", "Cozinha", "QuartoCasal", "QuartoSolteiro", "Sala", "Suite", "SuiteEntrada"];
+  function PF(k){ return k; }
+  var OPT_VER = {};   // sufixo de máscaras refeitas, por ponto
+  var OPC = {
+    piso:    {t:"Piso", ch:["A",0], o:[{n:"porcelanato cimentício", s:0, sw:"#958c80"}, {n:"cimentício claro", s:1, sw:"#b8b6b0"}]},
+    madeira: {t:"Piso de madeira", ch:["A",1], o:[{n:"demolição", s:0, sw:"#7a5230"}, {n:"nogueira escura", s:1, sw:"#4a3a30"}, {n:"carvalho claro", s:2, sw:"#b58a5e"}]},
+    aereos:  {t:"Armários aéreos", ch:["A",2], o:[{n:"peroba", s:0, sw:"#7b4a2a"}, {n:"imbuia escura", s:1, sw:"#4b2a18"}, {n:"freijó claro", s:2, sw:"#b98a55"}]},
+    cortina: {t:"Cortina", ch:["B",0], o:[{n:"linho cru", s:0, sw:"#e6dccb"}, {n:"linho cinza", s:1, sw:"#969694"}]},
+    parede:  {t:"Parede da TV", ch:["B",1], o:[{n:"cimento queimado", s:0, sw:"#7e8186"}, {n:"travertino", s:1, sw:"#d9c9a8"}]},
+    bancada: {t:"Bancada", ch:["B",2], o:[{n:"pedra escura", s:0, sw:"#3a3836"}, {n:"quartzo branco", s:1, sw:"#eeece7"}]},
+    cabeceira: {t:"Parede da cabeceira", ch:["C",0], o:[{n:"peroba", s:0, sw:"#7b4a2a"}, {n:"freijó claro", s:1, sw:"#c49a64"}, {n:"cimento queimado", s:2, sw:"#7e8186"}]},
+    portal: {t:"Vão corredor–copa", ch:["C",1], o:[{n:"pintura", s:0, sw:"#efece6"}, {n:"madeira freijó", s:1, sw:"#b98a55"}, {n:"travertino", s:2, sw:"#d9c9a8"}]},
+    tvsuite: {t:"Parede da TV", ch:["C",2], o:[{n:"cimento queimado", s:0, sw:"#7e8186"}, {n:"travertino", s:1, sw:"#d9c9a8"}, {n:"pintura", s:2, sw:"#efece6"}]}
+  };
+  var optI = {piso:0, madeira:0, aereos:0, cortina:0, parede:0, bancada:0, cabeceira:0, portal:0, tvsuite:0};   // o modelo já está com o padrão escolhido
+  var optTex = {room:null, var1:null, var2:null, A:null, B:null, C:null};
+  function needSet(n){ return Object.keys(OPC).some(function(e){ return OPC[e].o[optI[e]].s === n; }); }
+  function loadOptTex(key, which, cb){
+    if (optTex.room !== key) { cb && cb(); return; }
+    if (optTex[which]) { cb && cb(); return; }
+    var f = which === "A" || which === "B" || which === "C" ? key + "_opt" + which + (OPT_VER[key] || "") + ".png" : key + "_v" + which.slice(3) + (mode === "render" ? "r" : "") + (MOBILE ? "_m" : "") + ".jpg", md0 = mode;
+    loader.load(f, function(t){
+      t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+      if (optTex.room !== key || optTex.mode !== md0) { t.dispose(); return; }
+      optTex[which] = t;
+      var u = mat.uniforms;
+      if (which === "A") u.optA.value = t; else if (which === "B") u.optB.value = t; else if (which === "C") u.optC.value = t; else u[which].value = t;
+      if (optTex.A && optTex.B && optTex.C) u.hasOpt.value = 1;
+      cb && cb();
+    });
+  }
+  function weightsNow(){
+    var u = mat.uniforms, v = {w1A:[0,0,0], w1B:[0,0,0], w2A:[0,0,0], w2B:[0,0,0], w1C:[0,0,0], w2C:[0,0,0]};
+    Object.keys(OPC).forEach(function(e){ var o = OPC[e], st = o.o[optI[e]].s; if (st) v["w" + st + o.ch[0]][o.ch[1]] = 1; });
+    return v;
+  }
+  function applyWeights(instant){
+    var u = mat.uniforms, tgt = weightsNow(), keys = ["w1A","w1B","w2A","w2B","w1C","w2C"];
+    var from = keys.map(function(k){ return u[k].value.toArray(); });
+    if (instant) { keys.forEach(function(k){ u[k].value.fromArray(tgt[k]); }); return; }
+    anim(550, function(e){ keys.forEach(function(k, i){ var a = from[i], b = tgt[k]; u[k].value.set(a[0]+(b[0]-a[0])*e, a[1]+(b[1]-a[1])*e, a[2]+(b[2]-a[2])*e); }); });
+  }
+  function enterOptRoom(key){
+    var u = mat.uniforms;
+    ["var1","var2","A","B","C"].forEach(function(k){ if (optTex[k]) optTex[k].dispose(); optTex[k] = null; });
+    u.hasOpt.value = 0; u.var1.value = blank; u.var2.value = blank; u.optA.value = blank; u.optB.value = blank; u.optC.value = blank;
+    optTex.room = OPT_ROOMS.indexOf(key) >= 0 ? PF(key) : null; optTex.mode = mode;
+    if (!optTex.room) return;
+    key = optTex.room;
+    applyWeights(true);
+    // as vistas com opção entram antes das máscaras, para nunca misturar com uma textura vazia
+    var pend = [];
+    if (needSet(1)) pend.push("var1");
+    if (needSet(2)) pend.push("var2");
+    (function next(){ if (pend.length) loadOptTex(key, pend.shift(), next); else { loadOptTex(key, "A"); loadOptTex(key, "B"); loadOptTex(key, "C"); } })();
+    if (!MOBILE) setTimeout(function(){ loadOptTex(key, "var1"); loadOptTex(key, "var2"); }, 2500);
+  }
+  function cycleOpt(e){
+    var o = OPC[e]; optI[e] = (optI[e] + 1) % o.o.length;
+    var st = o.o[optI[e]].s, key = PF(current);
+    if (st && optTex.room === key && !optTex["var" + st]) loadOptTex(key, "var" + st, function(){ applyWeights(false); });
+    else applyWeights(false);
+  }
+  var OPT_SVG = {
+    piso: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linejoin="round"><path d="M3 15l9-5 9 5-9 5z"/><path d="M7.5 12.5l9 5M16.5 12.5l-9 5"/></svg>',
+    madeira: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"><path d="M3 7h18M3 12h18M3 17h18"/><path d="M9 7v5M16 12v5M6 17v3M13 4v3"/></svg>',
+    aereos: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="8" rx="1"/><path d="M12 4v8M9 9.5h1M14 9.5h1M3 20h18"/></svg>',
+    cortina: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18"/><path d="M5 4c0 6 1 11 3 16M9 4c0 6-1 11-1 16M19 4c0 6-1 11-3 16M15 4c0 6 1 11 1 16"/></svg>',
+    parede: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9.3h18M3 14.6h18M9 4v5.3M15 9.3v5.3M9 14.6V20"/></svg>',
+    cabeceira: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="8" rx="1"/><path d="M3 21v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6M3 18h18"/></svg>',
+    tvsuite: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 21h8M12 17v4"/></svg>',
+    portal: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V4h16v17"/><path d="M8 21V8h8v13"/></svg>',
+    bancada: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9h20v3H2z"/><path d="M4 12v8M20 12v8M8 15h8"/></svg>'
+  };
+  // ---- TVs ----
+  var TVS = {"Suite": {"suite": [[141.323, -24.913, 1.1751], [-141.323, -24.913, 1.1751], [-141.323, 10.525, 1.084], [141.323, 10.525, 1.084]]}, "QuartoCasal": {"casal": [[-77.62, -25.237, 1.4284], [-41.568, -17.755, 1.9971], [-41.568, -0.392, 1.902], [-77.62, -0.576, 1.2921]]}, "Sala": {"sala": [[-17.723, -11.943, 2.938], [19.601, -11.815, 2.9693], [19.601, 8.57, 2.9392], [-17.723, 8.664, 2.9076]]}, "Copa": {"sala": [[-46.416, -6.484, 5.3839], [-28.77, -8.223, 4.2511], [-28.77, 5.943, 4.2301], [-46.416, 4.681, 5.3674]]}, "Cozinha": {"sala": [[140.56, -4.653, 7.4953], [147.976, -5.955, 5.8609], [147.976, 4.297, 5.8457], [140.56, 3.355, 7.4834]]}, "SuiteEntrada": {"suite": [[12.361, -7.119, 3.9939], [31.536, -8.14, 3.496], [31.536, 3.275, 3.4664], [12.361, 2.86, 3.9681]]}}, TV_ICON = {"Suite": {"suite": [180.0, -34.75]}, "QuartoCasal": {"casal": [-59.11, -26.5]}, "Sala": {"sala": [0.94, -16.52]}, "Copa": {"sala": [-37.61, -11.44]}, "Cozinha": {"sala": [144.26, -9.32]}, "SuiteEntrada": {"suite": [21.94, -11.74]}};
+  var tvOn = false, tvMeshes = [], tvVideo = null, tvTex = null;
+  OPT_SVG.tv = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="12" rx="1.5"/><path d="M8 21h8M12 17v4M10 9l4 2-4 2z"/></svg>';
+  function tvVideoEl(){
+    if (tvVideo) return tvVideo;
+    tvVideo = document.createElement("video");
+    tvVideo.src = "tv.mp4"; tvVideo.loop = true; tvVideo.playsInline = true; tvVideo.setAttribute("playsinline", ""); tvVideo.preload = "auto";
+    tvTex = new THREE.VideoTexture(tvVideo); tvTex.minFilter = THREE.LinearFilter; tvTex.magFilter = THREE.LinearFilter;
+    return tvVideo;
+  }
+  function clearTV(){ tvMeshes.forEach(function(mm){ scene.remove(mm); mm.geometry.dispose(); mm.material.dispose(); }); tvMeshes = []; }
+  function buildTV(key){
+    clearTV();
+    var d = TVS[key];
+    if (!d) { if (tvVideo && !tvVideo.paused) tvVideo.pause(); return; }
+    if (!tvOn) return;
+    var v = tvVideoEl();
+    Object.keys(d).forEach(function(n){
+      var cs = d[n], mx = Math.max.apply(null, cs.map(function(c){ return c[2]; })), k = 420 / mx;
+      var P = cs.map(function(c){ return dirFor(c[0], c[1]).multiplyScalar(c[2] * k); });
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute([P[0].x,P[0].y,P[0].z, P[1].x,P[1].y,P[1].z, P[2].x,P[2].y,P[2].z, P[3].x,P[3].y,P[3].z], 3));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute([0,0, 1,0, 1,1, 0,1], 2));
+      g.setIndex([0,1,2, 0,2,3]);
+      var mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({map: tvTex, side: THREE.DoubleSide}));
+      mesh.renderOrder = 2; scene.add(mesh); tvMeshes.push(mesh);
+    });
+    var pr = v.play(); if (pr && pr.catch) pr.catch(function(){});
+  }
+  var SVG_SOM = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg>';
+  var SVG_MUDO = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
+  var tvMuted = false;
+  // botão de mudo colado ao ícone de ligar/desligar de cada TV
+  function syncMute(){
+    [].forEach.call(document.querySelectorAll('.ic[data-kind^="tv_"]'), function(el){
+      var b = el.querySelector(".mute");
+      if (!b) {
+        b = document.createElement("button"); b.type = "button"; b.className = "mute";
+        b.addEventListener("click", function(e){ e.stopPropagation(); tvMuted = !tvMuted; if (tvVideo) tvVideo.muted = tvMuted; syncMute(); });
+        b.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+        el.appendChild(b);
+      }
+      b.hidden = !tvOn; b.innerHTML = tvMuted ? SVG_MUDO : SVG_SOM;
+      b.title = tvMuted ? "Sem som (toque para ligar o som)" : "Com som (toque para deixar mudo)";
+      b.setAttribute("aria-label", b.title); b.setAttribute("aria-pressed", tvMuted ? "true" : "false");
+    });
+  }
+  function toggleTV(){
+    tvOn = !tvOn;
+    var v = tvVideoEl();
+    if (tvOn) { v.muted = tvMuted; buildTV(current); }
+    else { v.pause(); clearTV(); }
+    document.getElementById("tvcredit").hidden = !tvOn; syncMute();
+    icEls.forEach(function(o){ o.sync(); });
+  }
+  // ---- pintura das paredes ----
+  var PINT = [{n:"branco gelo", c:[1,1,1], sw:"#f1eee8"}, {n:"cinza claro", c:[0.84,0.85,0.855], sw:"#c8c9c6"},
+              {n:"amarelo palha", c:[0.975,0.87,0.60], sw:"#e8cf8e"}, {n:"azul sereno", c:[0.69,0.79,0.89], sw:"#a7bcd0"},
+              {n:"verde-sálvia", c:[0.74,0.80,0.69], sw:"#b3bda1"}];
+  var PINT_POS = {"Sala": [-136.7, 9.4], "Copa": [35.4, 5.4], "Cozinha": [-146.3, -0.3], "Suite": [-83.4, 5.0], "SuiteEntrada": [74.6, -1.8], "Closet": [166.6, 18.9], "BanhoSuite": [33.5, 18.0], "QuartoSolteiro": [17.8, 5.0], "QuartoCasal": [-96.2, 11.9], "Corredor": [104.5, -2.2], "Despensa": [-107.7, 5.0], "AreaServico": [107.3, 8.9], "VarandaFrente1": [-101.0, 1.0], "VarandaFrente2": [-149.5, 11.9], "Lateral1": [-152.7, 5.0], "Lateral2": [-129.1, 5.0], "Lateral3": [132.8, 5.0], "Fundos": [157.2, 11.5], "Gourmet1": [106.1, 1.3], "Gourmet2": [102.0, 9.6], "Deck1": [-164.4, -0.6], "Deck2": [168.3, -1.1], "Estacionamento": [-130.0, 4.1], "Lago": [169.4, 6.6], "FogoCaminho": [79.5, 4.7], "Fogueira": [62.1, 2.4]}, PINT_ROOMS = ["AreaServico", "BanhoSocial", "BanhoSuite", "Closet", "Copa", "Corredor", "Cozinha", "Deck1", "Deck2", "Despensa", "Estacionamento", "FogoCaminho", "Fogueira", "Fundos", "Gourmet1", "Gourmet2", "Lago", "Lateral1", "Lateral2", "Lateral3", "QuartoCasal", "QuartoSolteiro", "Sala", "Suite", "SuiteEntrada", "VarandaFrente1", "VarandaFrente2"], PINT_INT = ["Sala", "Copa", "Cozinha", "Corredor", "Suite", "SuiteEntrada", "Closet", "BanhoSuite", "BanhoSocial", "QuartoSolteiro", "QuartoCasal", "Despensa", "AreaServico"];
+  var pintI = {int:0, ext:0}, pintTex = {room:null, t:null};
+  function pintLado(key){ return PINT_INT.indexOf(key) >= 0 ? "int" : "ext"; }
+  function enterPintRoom(key){
+    var u = mat.uniforms;
+    if (pintTex.t) pintTex.t.dispose();
+    pintTex = {room:key, t:null}; u.usePint.value = 0; u.pintMap.value = blank;
+    var c = PINT[pintI[pintLado(key)]].c; u.pCol.value.set(c[0], c[1], c[2]);
+    if (PINT_ROOMS.indexOf(key) < 0) return;
+    loader.load(key + "_pint.png", function(t){
+      t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+      if (pintTex.room !== key) { t.dispose(); return; }
+      pintTex.t = t; u.pintMap.value = t; u.usePint.value = 1;
+    });
+  }
+  function cyclePint(){
+    var lado = pintLado(current), a = PINT[pintI[lado]].c; pintI[lado] = (pintI[lado] + 1) % PINT.length;
+    var b = PINT[pintI[lado]].c, v = mat.uniforms.pCol.value;
+    anim(600, function(e){ v.set(a[0]+(b[0]-a[0])*e, a[1]+(b[1]-a[1])*e, a[2]+(b[2]-a[2])*e); });
+  }
+  OPT_SVG.pint = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="15" height="6" rx="1.5"/><path d="M18 6h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-8v3"/><rect x="10" y="14" width="4" height="7" rx="1"/></svg>';
+  var icLayer = document.getElementById("ic-layer"), icEls = [];
+  function icLabel(kind){
+    if (kind === "pint") { var lado = pintLado(current), cur0 = PINT[pintI[lado]], nx0 = PINT[(pintI[lado]+1) % PINT.length];
+      return '<span class="sw" style="background:' + cur0.sw + '"></span>' + (lado === "int" ? "Pintura interna: " : "Pintura externa: ") + cur0.n + ' · trocar para ' + nx0.n; }
+    if (kind.indexOf("tv_") === 0) return tvOn ? "Desligar a TV" : "Ligar a TV";
+    if (OPC[kind]) { var oo = OPC[kind], cur = oo.o[optI[kind]], nx2 = oo.o[(optI[kind]+1) % oo.o.length];
+      return '<span class="sw" style="background:' + cur.sw + '"></span>' + oo.t + ': ' + cur.n + ' · trocar para ' + nx2.n; }
+    var o = kind === "sofa" ? SOFA[sofaI] : COZ[cozI], nx = kind === "sofa" ? SOFA[(sofaI+1)%2] : COZ[(cozI+1)%3];
+    return '<span class="sw" style="background:' + o.sw + '"></span>' + (kind === "sofa" ? "Sofá: " : "Armários: ") + o.n + ' · trocar para ' + nx.n;
+  }
+  function buildIcons(key){
+    icLayer.innerHTML = ""; icEls = [];
+    var cfg = {}, c0 = CORES[key] || {}, c1 = OPT_POS[key] || {};
+    ["sofa", "coz"].forEach(function(k){ if (c0[k]) cfg[k] = c0[k]; });
+    Object.keys(c1).forEach(function(k){ cfg[k] = c1[k]; });
+    if (PINT_POS[key]) cfg.pint = PINT_POS[key];
+    Object.keys(TV_ICON[key] || {}).forEach(function(n){ cfg["tv_" + n] = TV_ICON[key][n]; });
+    Object.keys(cfg).forEach(function(kind){
+      var pos = cfg[kind];
+      var el = document.createElement("div"); el.className = "ic"; el.dataset.kind = kind;
+      el.innerHTML = '<button type="button"></button><div class="lbl"></div>';
+      var b = el.querySelector("button"), lb = el.querySelector(".lbl");
+      b.innerHTML = (kind.indexOf("tv_") === 0 ? OPT_SVG.tv : OPT_SVG[kind]) || (kind === "sofa" ? SOFA_SVG : COZ_SVG);
+      function sync(){ lb.innerHTML = icLabel(kind); b.setAttribute("aria-label", lb.textContent); }
+      sync();
+      b.addEventListener("click", function(e){
+        e.stopPropagation();
+        if (kind.indexOf("tv_") === 0) toggleTV(); else if (kind === "pint") cyclePint(); else if (OPC[kind]) cycleOpt(kind);
+        else if (kind === "sofa"){ var f = SOFA[sofaI].c; sofaI = (sofaI+1)%2; tweenColor(mat.uniforms.sofaOn, mat.uniforms.tSofa, f, SOFA[sofaI].c); }
+        else { var g = COZ[cozI].c; cozI = (cozI+1)%3; tweenColor(mat.uniforms.cozOn, mat.uniforms.tCoz, g, COZ[cozI].c); }
+        icEls.forEach(function(o){ o.sync(); });
+      });
+      el.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      icLayer.appendChild(el);
+      icEls.push({el:el, sync:sync, v:dirFor(pos[0], pos[1]).multiplyScalar(440)});
+    });
+  }
+  function placeIcons(){
+    var w = VW(), h = VH();
+    icEls.forEach(function(o){
+      var p = o.v.clone().project(camera);
+      var vis = p.z < 1 && Math.abs(p.x) < 1.1 && Math.abs(p.y) < 1.1;
+      o.el.style.display = vis ? "block" : "none";
+      if (vis) o.el.style.transform = "translate(" + ((p.x+1)/2*w) + "px," + ((1-p.y)/2*h) + "px)";
+    });
+  }
+  // ---- luzes ----
+  var LUZ_ROOMS = ["AreaServico", "BanhoSocial", "BanhoSuite", "Closet", "Copa", "Corredor", "Cozinha", "Deck1", "Deck2", "Despensa", "Estacionamento", "FogoCaminho", "Fogueira", "Fundos", "Gourmet1", "Gourmet2", "Lago", "Lateral1", "Lateral2", "Lateral3", "QuartoCasal", "QuartoSolteiro", "Sala", "Suite", "SuiteEntrada", "VarandaFrente1", "VarandaFrente2"], LED_ROOMS = ["Copa", "Corredor", "Cozinha", "QuartoCasal", "Sala", "Suite", "SuiteEntrada"];
+  var luzOff = 0, luzTex = {room:null, off:null, led:null};
+  var luzBtn = document.getElementById("luzbtn");
+  function syncLuzBtn(){
+    var t = luzOff ? "Acender as luzes" : "Apagar as luzes";
+    luzBtn.querySelector(".lb").textContent = t; luzBtn.setAttribute("aria-label", t); luzBtn.classList.toggle("off", !!luzOff);
+    luzBtn.hidden = !(mode === "render" && LUZ_ROOMS.indexOf(current) >= 0);
+  }
+  function enterLightRoom(key){
+    var u = mat.uniforms;
+    if (luzTex.off) luzTex.off.dispose(); if (luzTex.led) luzTex.led.dispose();
+    luzTex = {room:key, off:null, led:null, mode:mode};
+    u.useLight.value = 0; u.ledOn.value = 0; u.offMap.value = blank; u.ledMap.value = blank; u.lightOff.value = luzOff;
+    syncLuzBtn();
+    if (mode !== "render" || LUZ_ROOMS.indexOf(key) < 0) return;
+    var md0 = mode;
+    function ok(){ return luzTex.room === key && luzTex.mode === md0; }
+    loader.load(key + "_luzoff.jpg", function(t){
+      t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+      if (!ok()) { t.dispose(); return; }
+      luzTex.off = t; u.offMap.value = t; u.useLight.value = 1;
+      if (LED_ROOMS.indexOf(key) >= 0) loader.load(key + "_luzled.jpg", function(t2){
+        t2.minFilter = THREE.LinearFilter; t2.generateMipmaps = false;
+        if (!ok()) { t2.dispose(); return; }
+        luzTex.led = t2; u.ledMap.value = t2; anim(500, function(e){ u.ledOn.value = e; });
+      });
+    });
+  }
+  luzBtn.addEventListener("click", function(e){
+    e.stopPropagation();
+    luzOff = luzOff ? 0 : 1; syncLuzBtn();
+    var u = mat.uniforms.lightOff, a0 = u.value, a1 = luzOff;
+    anim(700, function(k){ u.value = a0 + (a1 - a0)*k; });
+  });
+  luzBtn.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+  var fade = document.getElementById("fade");
+  function anim(dur, step, done){
+    var t0 = performance.now();
+    (function f(now){ var t = Math.min(1,(now-t0)/dur), e = t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; step(e); if (t<1) requestAnimationFrame(f); else if (done) done(); })(t0);
+  }
+  function shortest(a, b){ return ((b - a) % 360 + 540) % 360 - 180; }
+  function walkTo(link){
+    if (busy) return; busy = true; autoRot = false; syncRot();
+    var l0 = view.lon, la0 = view.lat, f0 = view.fov, dl = shortest(l0, link.lon), lat1 = Math.max(link.lat*0.4, -10);
+    getTex(link.to, function(){});
+    anim(700, function(e){ view.lon = l0 + dl*e; view.lat = la0 + (lat1-la0)*e; view.fov = f0 + (75-f0)*e; }, function(){
+      fade.style.opacity = 1;
+      anim(650, function(e){ view.fov = 75 - 40*e; }, function(){
+        getTex(link.to, function(){
+          setRoom(link.to, link.arrive); view.fov = 35;
+          setTimeout(function(){ fade.style.opacity = 0; anim(800, function(e){ view.fov = 35 + 40*e; }, function(){ busy = false; }); }, 120);
+        });
+      });
+    });
+  }
+  function jumpTo(key, look){
+    busy = true; fade.style.opacity = 1;
+    setTimeout(function(){ getTex(key, function(){ setRoom(key, look); view.fov = 75; fade.style.opacity = 0; setTimeout(function(){ busy = false; }, 350); }); }, 350);
+  }
+  var down = false, px = 0, py = 0, sl = 0, sla = 0, pinch = 0, pf = 0, pointers = {};
+  stage.addEventListener("pointerdown", function(e){
+    pointers[e.pointerId] = e; stage.setPointerCapture(e.pointerId);
+    var n = Object.keys(pointers).length;
+    if (n === 1){ down = true; px = e.clientX; py = e.clientY; sl = view.lon; sla = view.lat; stage.classList.add("drag"); autoRot = false; syncRot(); }
+    else if (n === 2){ var a = Object.values(pointers); pinch = Math.hypot(a[0].clientX-a[1].clientX, a[0].clientY-a[1].clientY); pf = view.fov; down = false; }
+    hideHint();
+  });
+  stage.addEventListener("pointermove", function(e){
+    if (!pointers[e.pointerId]) return; pointers[e.pointerId] = e;
+    var a = Object.values(pointers);
+    if (a.length === 2 && pinch){ var d = Math.hypot(a[0].clientX-a[1].clientX, a[0].clientY-a[1].clientY); view.fov = clampF(pf*pinch/d); return; }
+    if (!down || busy) return;
+    var k = view.fov / VH();
+    view.lon = sl - (e.clientX - px)*k; view.lat = sla + (e.clientY - py)*k;
+  });
+  function up(e){ delete pointers[e.pointerId]; if (Object.keys(pointers).length < 2) pinch = 0; if (!Object.keys(pointers).length){ down = false; stage.classList.remove("drag"); } }
+  stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+  stage.addEventListener("wheel", function(e){ e.preventDefault(); if (!busy) view.fov = clampF(view.fov + e.deltaY*0.05); }, {passive:false});
+  function clampF(f){ return Math.max(30, Math.min(100, f)); }
+  var btnR = document.getElementById("btn-render"), btnM = document.getElementById("btn-mod"), tag = document.getElementById("modetag");
+  function setMode(m){
+    if (m === mode || busy) return; busy = true;
+    getTex(current, function(t){
+      mode = m; btnR.classList.toggle("on", m === "render"); btnM.classList.toggle("on", m === "mod");
+      tag.textContent = m === "render" ? "Render" : "Modelagem";
+      fade.style.opacity = 1;
+      setTimeout(function(){ mat.uniforms.map.value = t; applyMask(current); enterOptRoom(current); enterLightRoom(current); fade.style.opacity = 0; setTimeout(function(){ busy = false; }, 350); }, 350);
+    }, m);
+  }
+  btnR.addEventListener("click", function(){ setMode("render"); });
+  btnM.addEventListener("click", function(){ setMode("mod"); });
+  var btnRot = document.getElementById("btn-rot");
+  function syncRot(){ btnRot.classList.toggle("on", autoRot); }
+  btnRot.addEventListener("click", function(){ autoRot = !autoRot; syncRot(); });
+  document.getElementById("btn-fs").addEventListener("click", function(){
+    try { if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function(){}); else document.exitFullscreen(); } catch(e){}
+  });
+  var hint = document.getElementById("hint"), hintT = setTimeout(hideHint, 7000);
+  function hideHint(){ hint.style.opacity = 0; clearTimeout(hintT); }
+  function fit(){ stage.style.width = VW() + "px"; stage.style.height = VH() + "px"; camera.aspect = VW()/VH(); camera.updateProjectionMatrix(); renderer.setSize(VW(), VH()); }
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", fit);
+  setTimeout(fit, 300); setTimeout(fit, 1500);
+  window.addEventListener("resize", function(){ camera.aspect = VW()/VH(); camera.updateProjectionMatrix(); renderer.setSize(VW(), VH()); });
+  function loop(){
+    requestAnimationFrame(loop);
+    if (autoRot && !busy) view.lon += 0.2;
+    view.lon = ((view.lon + 180) % 360 + 360) % 360 - 180;
+    view.lat = Math.max(-85, Math.min(85, view.lat));
+    camera.fov = view.fov; camera.updateProjectionMatrix();
+    camera.lookAt(dirFor(view.lon, view.lat).multiplyScalar(500));
+    renderer.render(scene, camera); placeHotspots(); placeIcons();
+  }
+  getTex("VarandaFrente1", function(){
+    setRoom("VarandaFrente1", ROOMS.VarandaFrente1.start);
+    var ld = document.getElementById("loading"); ld.style.opacity = 0; setTimeout(function(){ ld.remove(); }, 700);
+    loop();
+  });
+})();
+</script>
+
+</body>
+</html>
